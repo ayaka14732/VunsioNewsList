@@ -4,6 +4,13 @@ import re
 import requests
 from typing import Optional
 
+def get_last_date() -> datetime.date:
+    with open('list.tsv', encoding='utf-8') as f:
+        for line in f:
+            pass  # locate the last line
+        date, _, _ = line.rstrip('\n').split('\t')
+        return datetime.date.fromisoformat(date)
+
 def page_html2video_url(page_html: str) -> Optional[str]:
     match = re.search(r'function \(\) {createPlayer\("video:\/\/vid:([0-9a-f]+)","[^"]+","(\d{4}-\d{2}-\d{2})","[^"]+","[^"]+"\)}', page_html)
     if match:
@@ -22,6 +29,8 @@ def scrape_list_page(list_url: str) -> None:
     response.raise_for_status()
     response.encoding = 'utf-8'
     html_str = response.text
+
+    res = []
 
     for li in reversed(BeautifulSoup(html_str, features='html.parser').select('.videolist ul li')):
         a = li.select_one('a')
@@ -46,8 +55,17 @@ def scrape_list_page(list_url: str) -> None:
 
             video_url = page_html2video_url(page_html)
 
-            print(str(date), post_url, video_url, sep='\t')
+            res.append((date, post_url, video_url))
+
+    return res
 
 if __name__ == '__main__':
+    last_date = get_last_date()
+
     list_url = f'http://news.gdmztv.com/service900/1.shtml'
-    scrape_list_page(list_url)
+    videos = scrape_list_page(list_url)
+
+    with open('list.tsv', 'a', encoding='utf-8') as f:
+        for date, post_url, video_url in videos:
+            if date > last_date:
+                print(str(date), post_url, video_url, sep='\t', file=f)
