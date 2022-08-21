@@ -22,9 +22,7 @@ headers = {
     'User-Agent': 'Mozilla/5.0 (Linux; Android 9; INE-AL00 Build/HUAWEIINE-AL00; wv) AppleWebKit/537.36 (KHTML, like Gecko) Version/4.0 Chrome/104.0.5112.69 Mobile Safari/537.36 Html5Plus/1.0 (Immersed/35.294117)',
 }
 
-page_num = 0
-
-while True:
+for page_num in range(6):  # range(124, 300)
     payload = {
         'appInfoId': '32',
         'keyword': '《文昌新闻》海南话',
@@ -57,7 +55,3 @@ while True:
             video_url = determine_video_url(content) or item['properties']['accessUrl']
 
             print(title, post_url, video_url, sep=',')
-
-    page_num += 1
-    if page_num == 124:
-        break
