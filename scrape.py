@@ -1,9 +1,13 @@
+import aiohttp
+from aiohttp_socks import ProxyConnector
+import asyncio
 import json
-import re
-import requests
 import logging
+import re
 
 logging.basicConfig(level=logging.DEBUG)
+
+num_pages = 180
 
 url = 'http://hongqi.wengegroup.com:9001/search/searchUserSprint'
 
@@ -16,11 +20,6 @@ headers = {
     'app_info_id': '32',
     'Cookie': 'SESSION=ff7c6bee-1747-4316-be92-4ae6be1bb29c',
     'User-Agent': 'Mozilla/5.0 (Linux; Android 9; INE-AL00 Build/HUAWEIINE-AL00; wv) AppleWebKit/537.36 (KHTML, like Gecko) Version/4.0 Chrome/104.0.5112.69 Mobile Safari/537.36 Html5Plus/1.0 (Immersed/35.294117)',
-}
-
-proxies = {
-    'http': 'socks5://127.0.0.1:1081/',
-    'https': 'socks5://127.0.0.1:1081/',
 }
 
 def read_existing_list(filename: str='list.csv') -> dict:
@@ -38,7 +37,7 @@ def get_video_url_from_content(content: str) -> str:
             return match.group(1)
     return ''
 
-def request_search(page: int) -> dict:
+async def request_search(session: aiohttp.ClientSession, page: int) -> dict:
     d = {}
 
     payload = {
@@ -49,10 +48,12 @@ def request_search(page: int) -> dict:
         'pageSize': 10,
     }
 
-    r = requests.post(url, data=json.dumps(payload), headers=headers, proxies=proxies)
+    logging.debug(f'Requesting page {page}...')
+    r = await session.post(url, data=json.dumps(payload))
     r.raise_for_status()
-    obj = r.json()
+    obj = await r.json()
     assert obj['success']
+    logging.debug(f'Requesting page {page} done')
 
     for item in obj['data'][0]['sprintList']:
         title = item['title']
@@ -76,13 +77,22 @@ def request_search(page: int) -> dict:
 
     return d
 
-def main():
-    final_data = {**{k: v for page in range(20) for k, v in request_search(page).items()}, **read_existing_list()}
-    final_data = sorted((title, post_url, video_url) for title, (post_url, video_url) in final_data.items())
-
-    with open('list2.csv', 'w', encoding='utf-8') as f:
-        for title, post_url, video_url in final_data:
+def write_list(l: list):
+    with open('list.csv', 'w', encoding='utf-8') as f:
+        for title, post_url, video_url in l:
             print(title, post_url, video_url, sep=',', file=f)
 
-if __name__ == '__main__':
-    main()
+async def main():
+    connector = ProxyConnector.from_url('socks5://127.0.0.1:1081')
+    async with aiohttp.ClientSession(connector=connector, headers=headers) as session:
+        tasks = []
+        for page in range(num_pages):
+            task = request_search(session, page)
+            tasks.append(task)
+        res = await asyncio.gather(*tasks)
+    d = {**{k: v for d in res for k, v in d.items()}, **read_existing_list()}
+    l = sorted((title, post_url, video_url) for title, (post_url, video_url) in d.items())
+    write_list(l)
+
+loop = asyncio.get_event_loop()
+loop.run_until_complete(main())
