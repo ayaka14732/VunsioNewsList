@@ -2,6 +2,8 @@
 
 ## 文昌新聞 (bunsio-news)
 
+<https://www.youtube.com/channel/UCo_54F2Xb9lzBcnNkHv-b-w>
+
 ## 服务 900 (service-900)
 
 ![](banner.jpg)
