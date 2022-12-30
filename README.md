@@ -16,5 +16,5 @@ Copy `.env.template` to `.env`, and edit.
 Add to cron:
 
 ```
-8 23 * * * /path/to/dir/update.sh
+35 6 * * * /path/to/dir/update.sh
 ```

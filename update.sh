@@ -8,7 +8,7 @@ python scrape.py
 STATUS=$(git status --porcelain)
 
 if [[ $STATUS ]]; then
-    RESULT=$(git diff -U0 list.csv | grep '^[+-]' | grep -Ev '^(--- a/|\+\+\+ b/)' | sed 's/^+//g' | perl -pe 's/^(\d+)-(\d+)-(\d+),(.+),(.+)$/aria2c -x16 -s16 -c -o \1\2\3.mp4 \5/g')
+    RESULT=$(git diff -U0 list.csv | grep '^[+-]' | grep -Ev '^(--- a/|\+\+\+ b/)' | sed 's/^[+]//g' | perl -pe 's/^(\d+)-(\d+)-(\d+),(.+),(.+)$/aria2c -x16 -s16 -c -o \1\2\3.mp4 \5/g')
 
     curl "https://api.telegram.org/$BOT_TOKEN/sendMessage" -d "chat_id=$CHAT_ID" -d "text=\`\`\`
 $RESULT
