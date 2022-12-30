@@ -1,5 +1,4 @@
 import aiohttp
-from aiohttp_socks import ProxyConnector
 import asyncio
 import json
 import logging
@@ -83,8 +82,7 @@ def write_list(l: list):
             print(title, post_url, video_url, sep=',', file=f)
 
 async def main():
-    connector = ProxyConnector.from_url('socks5://127.0.0.1:1081')
-    async with aiohttp.ClientSession(connector=connector, headers=headers) as session:
+    async with aiohttp.ClientSession(headers=headers) as session:
         tasks = []
         for page in range(num_pages):
             task = request_search(session, page)

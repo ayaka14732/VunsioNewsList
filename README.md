@@ -2,8 +2,19 @@
 
 <https://www.youtube.com/@vunsio-news>
 
-Update:
+Setup:
 
 ```sh
-git diff -U0 list.csv | grep '^[+-]' | grep -Ev '^(--- a/|\+\+\+ b/)' | sed 's/^[+]//g' | perl -pe 's/^(\d+)-(\d+)-(\d+),(.+),(.+)$/aria2c -x16 -s16 -c -o \1\2\3.mp4 \5/g'
+python -m venv venv
+. venv/bin/activate
+pip install -U pip
+pip install -r requirements.txt
+```
+
+Copy `.env.template` to `.env`, and edit.
+
+Add to cron:
+
+```
+8 23 * * * /path/to/dir/update.sh
 ```
