@@ -1,12 +1,13 @@
 import aiohttp
 import asyncio
+from bs4 import BeautifulSoup
 import json
 import logging
 import re
 
 logging.basicConfig(level=logging.DEBUG)
 
-num_pages = 180
+num_pages = 20
 
 url = 'http://hongqi.wengegroup.com:9001/search/searchUserSprint'
 
@@ -20,6 +21,10 @@ headers = {
     'Cookie': 'SESSION=ff7c6bee-1747-4316-be92-4ae6be1bb29c',
     'User-Agent': 'Mozilla/5.0 (Linux; Android 9; INE-AL00 Build/HUAWEIINE-AL00; wv) AppleWebKit/537.36 (KHTML, like Gecko) Version/4.0 Chrome/104.0.5112.69 Mobile Safari/537.36 Html5Plus/1.0 (Immersed/35.294117)',
 }
+
+def remove_html_tags(html_text: str) -> str:
+    soup = BeautifulSoup(html_text, 'html.parser')
+    return soup.get_text()
 
 def read_existing_list(filename: str='list.csv') -> dict:
     d = {}
@@ -45,6 +50,7 @@ async def request_search(session: aiohttp.ClientSession, page: int) -> dict:
         'loginUserId': '',
         'pageNum': page,
         'pageSize': 10,
+        'startTime': '2023-02-10T00:00:00',
     }
 
     logging.debug(f'Requesting page {page}...')
@@ -55,11 +61,9 @@ async def request_search(session: aiohttp.ClientSession, page: int) -> dict:
     logging.debug(f'Requesting page {page} done')
 
     for item in obj['data'][0]['sprintList']:
-        title = item['title']
+        title = remove_html_tags(item['title'])
 
-        if '文昌新闻' in title and '海南话' in title:
-            title = title.replace("<font color='red'>《文昌新闻》海南话</font>", '')
-
+        if '《文昌新闻》' in title and '海南话' in title:
             match = re.search(r'(\d+)年(\d+)月(\d+)', title)
             if match:
                 year, month, day = match.groups()
@@ -70,7 +74,9 @@ async def request_search(session: aiohttp.ClientSession, page: int) -> dict:
 
             content = item['content']
 
-            video_url = get_video_url_from_content(content) or item['properties']['accessUrl']
+            video_url = get_video_url_from_content(content) or item['properties'].get('accessUrl')
+            if not video_url:
+                continue
 
             d[title] = post_url, video_url
 
