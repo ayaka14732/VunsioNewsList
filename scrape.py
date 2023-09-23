@@ -1,6 +1,7 @@
 import aiohttp
 import asyncio
 from bs4 import BeautifulSoup
+from datetime import datetime
 import json
 import logging
 import re
@@ -26,7 +27,7 @@ def remove_html_tags(html_text: str) -> str:
     soup = BeautifulSoup(html_text, 'html.parser')
     return soup.get_text()
 
-def read_existing_list(filename: str='list.csv') -> dict:
+def read_list(filename: str='list.csv') -> dict:
     d = {}
     with open(filename, encoding='utf-8') as f:
         for line in f:
@@ -34,23 +35,53 @@ def read_existing_list(filename: str='list.csv') -> dict:
             d[title] = post_url, video_url
     return d
 
-def get_video_url_from_content(content: str) -> str:
-    if content:
-        match = re.search(r'<video src="([^"]+)"[^<>]+>', content)
+def write_list(l: list) -> None:
+    with open('list.csv', 'w', encoding='utf-8') as f:
+        for title, post_url, video_url in l:
+            print(title, post_url, video_url, sep=',', file=f)
+
+def get_video_url_from_content(content: str) -> str | None:
+    if not content:
+        return
+    soup = BeautifulSoup(content, 'html.parser')
+    video_tag = soup.find('video')
+    if not video_tag:
+        return
+    video_src = video_tag.get('src')
+    if not video_src:
+        return
+    return video_src
+
+def determine_title(item) -> str:
+    title = remove_html_tags(item['title'])
+
+    if '《文昌新闻》' in title and '海南话' in title:
+        match = re.search(r'(\d+)年(\d+)月(\d+)', title)
         if match:
-            return match.group(1)
-    return ''
+            year, month, day = match.groups()
+            return f'{year}-{month:0>2}-{day:0>2}'
+
+        match = re.search(r'(\d+)月(\d+)', title)
+        if match:
+            match = re.search(r'(\d+)月(\d+)', title)
+            month, day = match.groups()
+            year = datetime.strptime(item['pubDate'], "%Y-%m-%d %H:%M:%S").year
+            return f'{year}-{month:0>2}-{day:0>2}'
+
+    return title
 
 async def request_search(session: aiohttp.ClientSession, page: int) -> dict:
     d = {}
 
     payload = {
         'appInfoId': '32',
-        'keyword': '《文昌新闻》海南话',
         'loginUserId': '',
         'pageNum': page,
         'pageSize': 10,
-        'startTime': '2023-02-10T00:00:00',
+        'title': '《文昌新闻》海南话',
+        'content': '',
+        'columnId': '',
+        'startTime': '2023-06-01T00:00:00',
     }
 
     logging.debug(f'Requesting page {page}...')
@@ -61,13 +92,7 @@ async def request_search(session: aiohttp.ClientSession, page: int) -> dict:
     logging.debug(f'Requesting page {page} done')
 
     for item in obj['data'][0]['sprintList']:
-        title = remove_html_tags(item['title'])
-
-        if '《文昌新闻》' in title and '海南话' in title:
-            match = re.search(r'(\d+)年(\d+)月(\d+)', title)
-            if match:
-                year, month, day = match.groups()
-                title = f'{year}-{month:0>2}-{day:0>2}'
+            title = determine_title(item)
 
             post_url = item['url']
             post_url = post_url.replace('mixmedia/', '')
@@ -82,11 +107,6 @@ async def request_search(session: aiohttp.ClientSession, page: int) -> dict:
 
     return d
 
-def write_list(l: list):
-    with open('list.csv', 'w', encoding='utf-8') as f:
-        for title, post_url, video_url in l:
-            print(title, post_url, video_url, sep=',', file=f)
-
 async def main():
     async with aiohttp.ClientSession(headers=headers) as session:
         tasks = []
@@ -94,7 +114,7 @@ async def main():
             task = request_search(session, page)
             tasks.append(task)
         res = await asyncio.gather(*tasks)
-    d = {**{k: v for d in res for k, v in d.items()}, **read_existing_list()}
+    d = {**{k: v for d in res for k, v in d.items()}, **read_list()}
     l = sorted((title, post_url, video_url) for title, (post_url, video_url) in d.items())
     write_list(l)
 
