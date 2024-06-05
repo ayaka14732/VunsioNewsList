@@ -9,20 +9,3 @@ This repository contains the following contents:
 1. A Telegram bot to automatically push updates to a designated Telegram channel
 
 The videos are manually published on [YouTube](https://www.youtube.com/@vunsio-news).
-
-Setup:
-
-```sh
-python -m venv venv
-. venv/bin/activate
-pip install -U pip
-pip install -r requirements.txt
-```
-
-Copy `.env.template` to `.env`, and edit.
-
-Add to cron:
-
-```
-35 6 * * * /path/to/dir/update.sh
-```
