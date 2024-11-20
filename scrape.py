@@ -8,7 +8,7 @@ import re
 
 logging.basicConfig(level=logging.DEBUG)
 
-num_pages = 20
+num_pages = 8
 
 url = 'http://hongqi.wengegroup.com:9001/search/searchUserSprint'
 
