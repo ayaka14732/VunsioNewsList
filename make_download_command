@@ -1,0 +1,3 @@
+#!/usr/bin/env bash
+
+sed 's/^+//' updated.txt | perl -pe 's/^(\d+)-(\d+)-(\d+),(.+),(.+)$/aria2c -x16 -s16 -c -o \1\2\3.mp4 \5/g'

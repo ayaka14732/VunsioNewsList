@@ -1,27 +1,55 @@
-import aiohttp
-import asyncio
-from bs4 import BeautifulSoup
+import base64
 from datetime import datetime
 import json
 import logging
 import re
+import time
+
+from bs4 import BeautifulSoup
+import requests
 
 logging.basicConfig(level=logging.DEBUG)
 
-num_pages = 8
+num_pages = 1
 
-url = 'http://hongqi.wengegroup.com:9001/search/searchUserSprint'
+url = 'http://hongqi.wengegroup.com/activities/search/searchUserSprint'
 
-headers = {
-    'Accept': 'application/json, text/plain, */*',
-    'Accept-Language': 'en-US,en;q=0.5',
-    'Connection': 'keep-alive',
-    'Content-Type': 'application/json;charset=UTF-8',
-    'X-Requested-With': 'com.zkwg.wenchangnews',
-    'app_info_id': '32',
-    'Cookie': 'SESSION=ff7c6bee-1747-4316-be92-4ae6be1bb29c',
-    'User-Agent': 'Mozilla/5.0 (Linux; Android 9; INE-AL00 Build/HUAWEIINE-AL00; wv) AppleWebKit/537.36 (KHTML, like Gecko) Version/4.0 Chrome/104.0.5112.69 Mobile Safari/537.36 Html5Plus/1.0 (Immersed/35.294117)',
-}
+def custom_base64(s):
+    # UTF-8 encode then standard base64
+    return base64.b64encode(s.encode('utf-8')).decode('utf-8')
+
+def make_sign(url, method, timestamp=None):
+    if timestamp is None:
+        timestamp = int(time.time() * 1000)
+
+    payload = json.dumps({"url": url, "timestamp": timestamp, "method": method}, separators=(',', ':'))
+
+    # Step 1: base64
+    t = list(custom_base64(payload))
+    n = len(t) // 2
+
+    # Step 2: swap with steps [6, 2, 8, 3]
+    for step in [6, 2, 8, 3]:
+        for i in range(0, n, step):
+            t[i], t[n + i] = t[n + i], t[i]
+
+    return ''.join(t)
+
+def generate_headers():
+    sign = make_sign("search/searchUserSprint", "post")
+    headers = {
+        'Host': 'hongqi.wengegroup.com',
+        'Proxy-Connection': 'keep-alive',
+        'sign': sign,
+        'app_info_id': '32',
+        'Accept': 'application/json, text/plain, */*',
+        'Content-Type': 'application/json;charset=UTF-8',
+        'User-Agent': 'Mozilla/5.0 (Linux; Android 16; sdk_gphone64_x86_64 Build/BE4B.251210.005; wv) AppleWebKit/537.36 (KHTML, like Gecko) Version/4.0 Chrome/134.0.6998.135 Mobile Safari/537.36 Html5Plus/1.0 (Immersed/24.0)',
+        'X-Requested-With': 'com.zkwg.wenchangnews',
+        'Accept-Language': 'en-US,en;q=0.5',
+        'Cookie': 'SESSION=6129f918-7aed-452e-bea0-f527422ebbce',
+    }
+    return headers
 
 def remove_html_tags(html_text: str) -> str:
     soup = BeautifulSoup(html_text, 'html.parser')
@@ -70,7 +98,7 @@ def determine_title(item) -> str:
 
     return title
 
-async def request_search(session: aiohttp.ClientSession, page: int) -> dict:
+def request_search(page: int, headers) -> dict:
     d = {}
 
     payload = {
@@ -85,9 +113,9 @@ async def request_search(session: aiohttp.ClientSession, page: int) -> dict:
     }
 
     logging.debug(f'Requesting page {page}...')
-    r = await session.post(url, data=json.dumps(payload))
+    r = requests.post(url, headers=headers, data=json.dumps(payload))
     r.raise_for_status()
-    obj = await r.json()
+    obj = r.json()
     assert obj['success']
     logging.debug(f'Requesting page {page} done')
 
@@ -107,16 +135,19 @@ async def request_search(session: aiohttp.ClientSession, page: int) -> dict:
 
     return d
 
-async def main():
-    async with aiohttp.ClientSession(headers=headers) as session:
-        tasks = []
-        for page in range(num_pages):
-            task = request_search(session, page)
-            tasks.append(task)
-        res = await asyncio.gather(*tasks)
-    d = {**{k: v for d in res for k, v in d.items()}, **read_list()}
+def main():
+    d = {}
+
+    for page in range(num_pages):
+        headers = generate_headers()
+        res = request_search(page, headers)
+        d.update(res)
+
+        time.sleep(4)  # Pace requests to avoid scraping too quickly.
+
+    d = {**d, **read_list()}
     l = sorted((title, post_url, video_url) for title, (post_url, video_url) in d.items())
     write_list(l)
 
-loop = asyncio.get_event_loop()
-loop.run_until_complete(main())
+if __name__ == "__main__":
+    main()
